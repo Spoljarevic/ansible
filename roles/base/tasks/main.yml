@@ -1,0 +1,355 @@
+
+---
+- name: Install base packages with pacman
+  pacman:
+    name:
+      - rsync
+      - slurp
+      - swayimg
+      - wl-clipboard
+      - meson
+      - scdoc
+      - alsa-utils
+      - ansible
+      - baresip
+      - base
+      - base-devel
+      - bat
+      - bluez
+      - bluez-utils
+      - calc
+      - certbot
+      - certbot-nginx
+      - chafa
+      - darktable
+      - docker
+      - dunst
+      - fastfetch
+      - figlet
+      - filezilla
+      - fish
+      - flatpak
+      - foot
+      - git
+      - greetd
+      - grim
+      - grub
+      - hypridle
+      - hyprland
+      - hyprlock
+      - hyprpaper
+      - hyprpicker
+      - kitty
+      - lf
+      - man-db
+      - man-pages
+      - mpd
+      - mpv
+      - ncmpcpp
+      - nginx
+      - noto-fonts
+      - noto-fonts-cjk
+      - noto-fonts-emoji
+      - openssh
+      - pavucontrol
+      - piper
+      - pipewire-alsa
+      - pipewire-pulse
+      - qbittorrent
+      - qt5-wayland
+      - remmina
+      - torbrowser-launcher
+      - ttf-dejavu
+      - ttf-liberation
+      - ufw
+      - unzip
+      - vim
+      - waybar
+      - wayland
+      - wayland-protocols
+      - webkit2gtk
+      - wget
+      - whois
+      - wireguard-tools
+      - wl-clipboard
+      - wlroots
+      - wofi
+      - go
+    state: present
+    update_cache: true
+
+- name: Add flathub remote if not already added
+  command: flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+  args:
+    creates: /var/lib/flatpak/repo/flathub.trustedkeys.gpg
+
+- name: Install Flatpak applications
+  become: true
+  flatpak:
+    name:
+      - app.zen_browser.zen
+      - com.brave.Browser
+      - com.protonvpn.www
+      - com.vscodium.codium
+      - dev.vencord.Vesktop
+      - me.proton.Mail
+      - me.proton.Pass
+      - com.bitwarden.desktop
+    state: present
+    method: system
+
+- name: Create user directories
+  file:
+    path: "/home/{{ ansible_user }}/{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+  loop:
+    - downloads
+    - pictures
+    - music
+    - desktop
+
+- name: Ensure rsync is installed on target
+  package:
+    name: rsync
+    state: present
+
+
+- name: Copy ~/pictures from control to target
+  copy:
+    src: "{{ lookup('env','HOME') }}/pictures"
+    dest: "/home/{{ ansible_user }}/pictures"
+    mode: '0755'
+    remote_src: no
+  delegate_to: localhost
+
+- name: Set ownership of pictures directory on remote
+  file:
+    path: "/home/{{ ansible_user }}/pictures"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+
+
+- name: Clean up /tmp directory (non-sudo, only user-owned files)
+  delegate_to: localhost
+  become: false
+  shell: >
+    find /tmp -maxdepth 1 -user "$(whoami)" -type f -delete &&
+    find /tmp -maxdepth 1 -user "$(whoami)" -type d ! -path /tmp -exec rm -rf {} +
+
+- name: Remove .config directory on remote
+  file:
+    path: "/home/{{ ansible_user }}/.config"
+    state: absent
+
+- name: Recreate .config directory on target
+  file:
+    path: "/home/{{ ansible_user }}/.config"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Remove old config tarball if it exists
+  delegate_to: localhost
+  become: false
+  file:
+    path: /tmp/configs.tar.gz
+    state: absent
+
+- name: Create a tarball of contents of .config on localhost
+  delegate_to: localhost
+  become: false
+  shell: >
+    tar czf /tmp/configs.tar.gz -C "{{ lookup('env','HOME') }}/.config" .
+
+- name: Copy tarball to remote
+  copy:
+    src: /tmp/configs.tar.gz
+    dest: /tmp/configs.tar.gz
+    force: yes
+
+- name: Extract config tarball on target
+  unarchive:
+    src: /tmp/configs.tar.gz
+    dest: "/home/{{ ansible_user }}/.config"
+    remote_src: yes
+    extra_opts: [--no-overwrite-dir]
+
+- name: Set ownership of extracted config files
+  file:
+    path: "/home/{{ ansible_user }}/.config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+
+- name: Clean up /tmp directory (non-sudo, only user-owned files)
+  delegate_to: localhost
+  become: false
+  shell: >
+    find /tmp -maxdepth 1 -user "$(whoami)" -type f -delete &&
+    find /tmp -maxdepth 1 -user "$(whoami)" -type d ! -path /tmp -exec rm -rf {} +
+
+- name: Remove pictures directory on remote
+  file:
+    path: "/home/{{ ansible_user }}/pictures"
+    state: absent
+
+- name: Recreate pictures directory on target
+  file:
+    path: "/home/{{ ansible_user }}/pictures"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Remove old config tarball if it exists
+  delegate_to: localhost
+  become: false
+  file:
+    path: /tmp/configs.tar.gz
+    state: absent
+
+- name: Create a tarball of contents of pictures on localhost
+  delegate_to: localhost
+  become: false
+  shell: >
+    tar czf /tmp/configs.tar.gz -C "{{ lookup('env','HOME') }}/pictures" .
+
+- name: Copy tarball to remote
+  copy:
+    src: /tmp/configs.tar.gz
+    dest: /tmp/configs.tar.gz
+    force: yes
+
+- name: Extract config tarball on target
+  unarchive:
+    src: /tmp/configs.tar.gz
+    dest: "/home/{{ ansible_user }}/pictures"
+    remote_src: yes
+    extra_opts: [--no-overwrite-dir]
+
+- name: Set ownership of extracted config files
+  file:
+    path: "/home/{{ ansible_user }}/pictures"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    recurse: yes
+
+- name: Copy /usr/share/fonts from control to target
+  copy:
+    src: "/usr/share/fonts"
+    dest: "/usr/share/fonts"
+    mode: '0755'
+    remote_src: no
+  delegate_to: localhost
+
+- name: Set ownership of fonts on remote
+  file:
+    path: "/usr/share/fonts"
+    owner: root
+    group: root
+    recurse: yes
+
+- name: Ensure base-devel is installed
+  pacman:
+    name: base-devel
+    state: present
+    update_cache: true
+
+- name: Install git
+  pacman:
+    name: git
+    state: present
+
+- name: Install common AUR build dependencies
+  pacman:
+    name:
+      - base-devel
+      - git
+      - go
+      - rust
+      - meson
+      - ninja
+      - scdoc
+      - python
+      - python-pip
+    state: present
+    update_cache: true
+
+- name: Install paru prerequisites (runtime + build)
+  pacman:
+    name:
+      - freetype2
+      - harfbuzz
+      - cairo
+      - pango
+      - wayland
+      - libxkbcommon
+      - meson
+      - scdoc
+      - wayland-protocols
+      - git
+      - base-devel
+    state: present
+    update_cache: true
+  become: yes
+
+- name: Clone paru from AUR
+  git:
+    repo: "https://aur.archlinux.org/paru.git"
+    dest: /tmp/paru
+    clone: yes
+    update: no
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+- name: Build paru without installing (avoid sudo issue inside makepkg)
+  command: makepkg -sf --noconfirm
+  args:
+    chdir: /tmp/paru
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+- name: Find built paru package
+  find:
+    paths: /tmp/paru
+    patterns: "paru-*.pkg.tar.zst"
+    recurse: no
+  register: paru_packages
+
+- name: Fail if paru package was not found
+  fail:
+    msg: "No paru package found in /tmp/paru"
+  when: paru_packages.matched == 0
+
+- name: Install paru package via pacman
+  pacman:
+    name: "{{ item.path }}"
+    state: present
+  loop: "{{ paru_packages.files }}"
+  become: true
+
+- name: Allow passwordless paru-related commands (temporarily)
+  become: true
+  copy:
+    content: "{{ ansible_user }} ALL=(ALL) NOPASSWD: /usr/bin/pacman, /usr/bin/paru, /usr/bin/makepkg"
+    dest: "/etc/sudoers.d/99-paru-install"
+
+- name: Install tofi using paru (auto-select option)
+  become: true
+  become_user: "{{ ansible_user }}"
+  shell: echo "1" | paru -S --noconfirm --needed tofi
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/usr/bin:/usr/local/bin"
+  args:
+    executable: /bin/bash
+
+- name: Remove passwordless sudo permission after install
+  become: true
+  file:
+    path: "/etc/sudoers.d/99-paru-install"
+    state: absent

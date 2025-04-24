@@ -1,0 +1,7 @@
+---
+- name: Setup Arch Linux with Pacman and Flatpak apps
+  hosts: arch
+  become: true
+  roles:
+    - base
+

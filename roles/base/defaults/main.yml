@@ -1,0 +1,5 @@
+aur_helper: yay
+aur_user: "{{ ansible_user }}"
+aur_packages:
+  - tofi
+  - nerd-fonts-cascadia-code
