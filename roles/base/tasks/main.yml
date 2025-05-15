@@ -95,6 +95,7 @@
       - me.proton.Mail
       - me.proton.Pass
       - com.bitwarden.desktop
+      - com.slack.Slack
     state: present
     method: system
 
