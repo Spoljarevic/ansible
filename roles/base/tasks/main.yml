@@ -125,6 +125,7 @@
     mode: '0755'
     remote_src: no
   delegate_to: localhost
+  become: false
 
 - name: Set ownership of pictures directory on remote
   file:
@@ -354,3 +355,43 @@
   file:
     path: "/etc/sudoers.d/99-paru-install"
     state: absent
+
+- name: Clone snapd AUR repository
+  git:
+    repo: https://aur.archlinux.org/snapd.git
+    dest: /tmp/snapd
+    clone: yes
+    update: no
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+- name: Build and install snapd from AUR
+  command: makepkg -si --noconfirm
+  args:
+    chdir: /tmp/snapd
+  become: yes
+  become_user: "{{ ansible_user }}"
+
+- name: Enable and start snapd.socket
+  systemd:
+    name: snapd.socket
+    enabled: yes
+    state: started
+
+- name: Enable snapd.apparmor.service (if available)
+  systemd:
+    name: snapd.apparmor.service
+    enabled: yes
+    state: started
+  ignore_errors: yes  # in case apparmor isn't used or installed
+
+- name: Create /snap symlink
+  file:
+    src: /var/lib/snapd/snap
+    dest: /snap
+    state: link
+
+- name: Install Jami using snap
+  command: snap install jami
+  environment:
+    PATH: "/snap/bin:/usr/bin:/usr/local/bin:{{ ansible_env.PATH }}"
